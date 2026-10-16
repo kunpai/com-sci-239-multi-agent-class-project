@@ -18,6 +18,10 @@ def test_check_priced_rejects_unknown_cloud_model():
         llm.check_priced(["made-up-provider/model-x"])
 
 
+def test_prices_file_fills_gaps_in_litellms_price_map():
+    assert llm.has_price("nvidia_nim/meta/muse-glimmer-30b")   # from prices.json; LiteLLM's map lacks it
+
+
 def fake_response(text="hi"):
     return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=text, tool_calls=None))])
 

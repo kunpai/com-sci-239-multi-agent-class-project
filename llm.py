@@ -1,11 +1,16 @@
 """Every model call goes through LiteLLM, so any provider can be plugged in."""
+import json
 import os
+from pathlib import Path
 
 os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")  # use the bundled price map; no network at import
 
 import litellm  # must come after the env var above
 
 litellm.suppress_debug_info = True
+PRICES = Path(__file__).parent / "prices.json"  # prices for models LiteLLM's map lacks (see README)
+if PRICES.exists():
+    litellm.register_model(json.loads(PRICES.read_text()))
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 MAX_USD = float(os.environ.get("MAX_USD", "2.00"))
 spent_total = 0.0

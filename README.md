@@ -19,7 +19,9 @@ uv run pytest -q
 ```
 
 Local models need [Ollama](https://ollama.com) running. Any LiteLLM model string works: an `ollama_chat/...`
-model is local, and anything else is cloud.
+model is local, and anything else is cloud. A cloud model that LiteLLM can't price is refused at startup;
+add its per-token price to `prices.json` (this repo prices NVIDIA NIM's `meta/muse-glimmer-30b` at
+Together/Fireworks rates for the same model, as a conservative estimate).
 
 ## Files
 
