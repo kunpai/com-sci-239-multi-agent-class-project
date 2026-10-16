@@ -2,3 +2,6 @@
 __pycache__/
 .pytest_cache/
 .env
+
+# Claude Code session logs
+.claude/
