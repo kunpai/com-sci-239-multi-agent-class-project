@@ -39,5 +39,5 @@ Together/Fireworks rates for the same model, as a conservative estimate).
 
 - **Phase 1** (tag `phase1`): no enforcement. Policies are only prompt text, and the traces in
   `traces/phase1/` show agents breaking them.
-- **Phase 2** (tag `phase2`): `--enforce` blocks violations at the chokepoint. See
-  [policies.md](policies.md).
+- **Phase 2** (later in the course): port to the course's policy-assurance framework, which will enforce
+  R1–R5 at the same chokepoint (`agent.call_tool` / `agent.ask_agent`).
