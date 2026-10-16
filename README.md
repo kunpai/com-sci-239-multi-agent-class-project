@@ -13,7 +13,7 @@ A minimal multi-agent orchestrator for UCLA CS239 (Fall 2026), based on the desi
 ```bash
 cp .env.example .env              # set CEO_MODEL, MODELS and your provider key
 uv sync
-uv run --env-file .env run.py s1  # scenarios: hello, s1, s2, s3, s4
+uv run --env-file .env run.py s1  # scenarios: hello, s1, s2, s3
 uv run check.py traces/phase1/*.jsonl
 uv run viewer.py                  # trace viewer at http://127.0.0.1:8239
 uv run pytest -q
@@ -37,12 +37,10 @@ Together/Fireworks rates for the same model, as a conservative estimate).
 | `viewer.py`, `viewer.html` | Web page with the architecture, the scenarios and every trace, violations marked in red |
 | `run.py` | Scenarios |
 
-## Phases
+## Phase 1
 
-- **Phase 1** (tag `phase1`): no enforcement. Policies are only prompt text, and the traces in
-  `traces/phase1/` show agents breaking them.
-- **Phase 2** (later in the course): port to the course's policy-assurance framework, which will enforce
-  R1–R5 at the same chokepoint (`agent.call_tool` / `agent.ask_agent`).
+Tag `phase1`. Nothing enforces the requirements: policies are only prompt text, and the traces in
+`traces/phase1/` show agents breaking them.
 
 ## Citation
 
