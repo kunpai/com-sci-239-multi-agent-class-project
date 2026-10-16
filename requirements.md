@@ -1,7 +1,7 @@
 # Requirements: HASHIRU-lite
 
 HASHIRU-lite is a multi-agent orchestrator based on the design of
-[HASHIRU](https://github.com/HASHIRU-AI/HASHIRU).
+[HASHIRU](https://github.com/HASHIRU-AI/HASHIRU) ([Pai et al., 2025](https://arxiv.org/abs/2506.04255)).
 
 - A **CEO** agent hires other agents while it runs. Each hire is either a **manager**, which uses tools and
   may hire, or a **worker**, which answers once.
