@@ -105,7 +105,8 @@ def test_r1_note_says_the_check_showed_too_little_memory(tmp_path):
     events = [START, check_pool(1, "ceo", free=1000), hire(2, "ceo", "w", model="ollama_chat/gemma4:12b")]
     text = note(tmp_path, events, 2, "R1")
     assert "ceo hired w on gemma4:12b, relying on its check at #1" in text
-    assert "only 1,000 MB free for a model that needs 7,206 MB" in text
+    assert "which showed only 1,000 MB free for a model that needs 7,206 MB" in text
+    assert "Nothing in between made that check stale" in text and "hired anyway" in text
     assert "Rule broken: R1 Fresh check." in text
 
 
@@ -115,7 +116,9 @@ def test_r1_note_names_the_hire_that_made_the_check_stale(tmp_path):
               hire(7, "m1", "w1", model="ollama_chat/gemma4:12b", usd=0.0),
               hire(8, "m2", "w2", model="ollama_chat/gemma4:12b", usd=0.0)]
     text = note(tmp_path, events, 8, "R1")
-    assert "relying on its check at #6" in text and "m1 loaded gemma4:12b at #7" in text and "out of date" in text
+    assert "relying on its check at #6, which showed 10,000 MB free" in text
+    assert "between that check and this hire, m1 loaded gemma4:12b (7,206 MB) at #7" in text
+    assert "That left about 2,794 MB free for a model that needs 7,206 MB" in text
 
 
 def test_r2_note_gives_the_money_left_and_the_overspend(tmp_path):
