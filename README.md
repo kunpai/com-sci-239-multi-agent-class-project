@@ -15,6 +15,7 @@ cp .env.example .env              # set CEO_MODEL, MODELS and your provider key
 uv sync
 uv run --env-file .env run.py s1  # scenarios: hello, s1, s2, s3, s4
 uv run check.py traces/phase1/*.jsonl
+uv run viewer.py                  # trace viewer at http://127.0.0.1:8239
 uv run pytest -q
 ```
 
@@ -33,6 +34,7 @@ Together/Fireworks rates for the same model, as a conservative estimate).
 | `tracelog.py` | JSONL trace and label rules |
 | `llm.py` | LiteLLM calls and the wallet cap |
 | `policy.py`, `check.py` | R1–R5 as checks over traces |
+| `viewer.py`, `viewer.html` | Web page with the architecture, the scenarios and every trace, violations marked in red |
 | `run.py` | Scenarios |
 
 ## Phases
