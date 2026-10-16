@@ -241,7 +241,7 @@ code.jl { display: block; font: 12px/1.6 var(--f-mono); white-space: pre-wrap; o
 .ev.bad { background: var(--bad-bg); box-shadow: inset 4px 0 0 var(--bad); }
 .ev.bad code.jl { color: var(--fg); }
 .ev.evid { background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
-.stamp { display: flex; flex-wrap: wrap; gap: 3px 10px; align-items: baseline; color: var(--bad); font-weight: 600; font-size: 13.5px; }
+.stamp { display: flex; flex-wrap: wrap; gap: 3px 10px; align-items: baseline; color: var(--bad); font-weight: 600; font-size: 13.5px; cursor: help; }
 .stamp .r.bad { font-size: 12px; }
 .evl { font-weight: 500; font-size: 12.5px; }
 .enote { font-size: 13px; color: var(--accent); }
@@ -503,9 +503,9 @@ body { margin: 0; }
   <div class="wrap">
     <p class="eyebrow">Every event, in order</p>
     <h2>Trace explorer</h2>
-    <div class="prose"><p>Each tab pairs a step-by-step walkthrough of one run with the full trace of whichever run you pick (one JSON event per row, in <code>seq</code> order). Click any <span class="sql">#seq</span> to jump to that event in the trace.</p></div>
+    <div class="prose"><p>Each tab pairs a step-by-step walkthrough of one run with the full trace of whichever run you pick (one JSON event per row, in <code>seq</code> order). Click any <span class="sql">#seq</span> to jump to that event in the trace. Hover over a red row, a red <span class="sql bad">#seq</span> or a violation chip to see what exactly went wrong and which rule it breaks.</p></div>
     <div class="legend">
-      <span><i class="sw bad"></i>breaks a requirement</span>
+      <span><i class="sw bad"></i>breaks a requirement (hover for what went wrong)</span>
       <span><i class="sw evid"></i>evidence: an earlier event the violation depends on</span>
       <span><i class="sw priv"></i>private label or canary string</span>
       <span><i class="sw untr"></i>untrusted label or planted instruction</span>
@@ -675,7 +675,8 @@ function who(e) {
 function rowHTML(e, r) {
   const v = r.vmap[e.seq] || [], ev = r.emap[e.seq] || [];
   const cls = "ev k-" + e.kind + (v.length ? " bad" : ev.length ? " evid" : "");
-  let h = `<div class="${cls}" data-seq="${e.seq}">`;
+  const tip = v.length ? ` title="${esc(notes(v))}"` : "";
+  let h = `<div class="${cls}" data-seq="${e.seq}"${tip}>`;
   h += `<div class="eh"><span class="sq">${e.seq}</span><span class="kd">${esc(e.kind)}</span><span class="wh">${who(e)}</span></div>`;
   for (const x of v) {
     const links = x.evidence.length ? `<span class="evl">evidence: ${x.evidence.map(([s, t]) => `<a href="#" class="go" data-seq="${s}" title="${esc(t)}">#${s}</a>`).join(" ")}</span>` : "";
@@ -688,6 +689,7 @@ function rowHTML(e, r) {
   return h;
 }
 function plural(n, w) { return `${n} ${w}${n === 1 ? "" : "s"}`; }
+function notes(vs) { return vs.map(x => x.note).join("\n\n"); }
 
 function runLabel(r) {
   const list = BY[r.scenario];
@@ -713,7 +715,7 @@ function drawViewer(scn) {
   const end = { "no reply": "the CEO never replied", "answered in text": "the CEO answered in text" }[r.outcome] || `the CEO replied "${r.outcome}"`;
   const meta = `${esc(tracePath(r))} · ${r.events.length} events · $${r.cost.toFixed(4)} · ${r.minutes.toFixed(1)} min · ${esc(end)}`;
   const index = r.violations.length
-    ? r.violations.map(v => `<button type="button" class="vchip" data-seq="${v.seq}" title="${esc(v.why)}">#${v.seq} ${v.rule}</button>`).join("")
+    ? r.violations.map(v => `<button type="button" class="vchip" data-seq="${v.seq}" title="${esc(v.note)}">#${v.seq} ${v.rule}</button>`).join("")
     : `<span class="okline">No violations: check.py passes this run.</span>`;
   const keep = e => !focus || r.vmap[e.seq] || r.emap[e.seq];
   let rows = "", hidden = 0, hiddenFrom = null;
@@ -797,6 +799,10 @@ function boot(data) {
     td.classList.add(n ? "hit" : "zero");
   }
   for (const [s, text] of Object.entries(data.scenarios)) set(`[data-prompt="${s}"]`, text);
+  for (const a of document.querySelectorAll(".sql.bad")) {
+    const v = RUN[a.dataset.run || a.closest(".walk")?.dataset.run]?.vmap[a.dataset.seq];
+    if (v) a.title = notes(v);
+  }
   state.ready = true;
   drawViewer(state.tab);
 }
