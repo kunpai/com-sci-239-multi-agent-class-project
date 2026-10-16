@@ -1,7 +1,7 @@
 # HASHIRU-lite
 
-A minimal multi-agent orchestrator for UCLA CS239 (Fall 2026), based on the design of
-[HASHIRU](https://github.com/HASHIRU-AI/HASHIRU).
+A minimal multi-agent orchestrator for UCLA CS239 (Fall 2026), based on the design of HASHIRU
+([Pai et al., 2025](https://arxiv.org/abs/2506.04255); [code](https://github.com/HASHIRU-AI/HASHIRU)).
 
 - A CEO agent hires managers and workers while it runs. Each runs locally on Ollama or in the cloud through
   LiteLLM.
@@ -43,3 +43,21 @@ Together/Fireworks rates for the same model, as a conservative estimate).
   `traces/phase1/` show agents breaking them.
 - **Phase 2** (later in the course): port to the course's policy-assurance framework, which will enforce
   R1–R5 at the same chokepoint (`agent.call_tool` / `agent.ask_agent`).
+
+## Citation
+
+HASHIRU-lite keeps HASHIRU's core design: a CEO agent that hires and fires agents under cost and memory
+limits, favoring local Ollama models over cloud APIs. It leaves out HASHIRU's autonomous tool creation. If
+you use this work, please cite the original paper:
+
+```bibtex
+@misc{pai2025hashiruhierarchicalagenthybrid,
+      title={HASHIRU: Hierarchical Agent System for Hybrid Intelligent Resource Utilization},
+      author={Kunal Pai and Parth Shah and Harshil Patel},
+      year={2025},
+      eprint={2506.04255},
+      archivePrefix={arXiv},
+      primaryClass={cs.MA},
+      url={https://arxiv.org/abs/2506.04255},
+}
+```
