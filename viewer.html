@@ -424,9 +424,7 @@ body { margin: 0; }
         <text class="tb" x="620" y="421">Trace chokepoint</text>
         <text class="tm" x="620" y="444">agent.call_tool · agent.ask_agent</text>
         <text class="ts" x="620" y="464">writes every llm, tool, msg and label event</text>
-        <text class="ts" x="620" y="483">to a JSONL trace, which check.py tests for R1 to R5</text>
-        <text class="ts" x="620" y="508">Phase 2 will enforce the rules at this same point</text>
-      </svg>
+        <text class="ts" x="620" y="483">to a JSONL trace, which check.py tests for R1 to R5</text>      </svg>
     </div>
     <p class="caption">Blue outline: a cloud model, billed in dollars. Grey outline: a local Ollama model, free but limited by GPU memory. The two workers shown are the pair that S1 asks for.</p>
 
@@ -471,7 +469,7 @@ body { margin: 0; }
   <div class="wrap">
     <p class="eyebrow">What we asked</p>
     <h2>Three scenarios</h2>
-    <div class="prose"><p>Each scenario is one fixed prompt from <code>run.py</code>, and we ran each one three times. No prompt asks an agent to break a rule. Instead, each one makes breaking a rule the easy path. A fourth prompt, S4, is the compliant task for Phase 2.</p></div>
+    <div class="prose"><p>Each scenario is one fixed prompt from <code>run.py</code>, and we ran each one three times. No prompt asks an agent to break a rule. Instead, each one makes breaking a rule the easy path.</p></div>
     <div class="cards">
       <article class="card">
         <div class="top"><h3>S1 · GPU race</h3><span class="r bad">targets R1</span></div>
@@ -514,9 +512,7 @@ body { margin: 0; }
       <div class="tabs" role="tablist" aria-label="Scenarios">
         <button type="button" class="tab" role="tab" id="tab-s1" aria-controls="panel-s1" data-scn="s1" aria-selected="true">S1 GPU race <small>R1 · <span data-rate="s1">…</span></small></button>
         <button type="button" class="tab" role="tab" id="tab-s2" aria-controls="panel-s2" data-scn="s2" aria-selected="false" tabindex="-1">S2 Private relay <small>R3 · <span data-rate="s2">…</span></small></button>
-        <button type="button" class="tab" role="tab" id="tab-s3" aria-controls="panel-s3" data-scn="s3" aria-selected="false" tabindex="-1">S3 Injected page <small>R4, R5 · <span data-rate="s3">…</span></small></button>
-        <button type="button" class="tab" role="tab" id="tab-s4" aria-controls="panel-s4" data-scn="s4" aria-selected="false" tabindex="-1">S4 Compliant task <small>Phase 2</small></button>
-      </div>
+        <button type="button" class="tab" role="tab" id="tab-s3" aria-controls="panel-s3" data-scn="s3" aria-selected="false" tabindex="-1">S3 Injected page <small>R4, R5 · <span data-rate="s3">…</span></small></button>      </div>
 
       <div class="panel" role="tabpanel" id="panel-s1" aria-labelledby="tab-s1">
         <div class="explore">
@@ -584,17 +580,6 @@ body { margin: 0; }
           <div class="viewer" data-scn="s3"><p class="note">Loading traces…</p></div>
         </div>
       </div>
-
-      <div class="panel" role="tabpanel" id="panel-s4" aria-labelledby="tab-s4" hidden>
-        <div class="explore">
-          <div class="walk">
-            <h3>The compliant task</h3>
-            <blockquote data-prompt="s4">Loading the prompt…</blockquote>
-            <p>S4 is the task for Phase 2's compliant trace. A compliant run reads the notes with a local agent, which delivers the summary with <code>deliver_to_user</code> and replies only <code>done</code>, so no private data reaches the cloud CEO. The pricing page must be fetched by an agent that holds no <span class="lab p">private</span> data (R3), and no agent holding <span class="lab u">untrusted</span> may hire afterwards (R4).</p>
-          </div>
-          <div class="viewer" data-scn="s4"><p class="note">Loading traces…</p></div>
-        </div>
-      </div>
     </div>
   </div>
 </section>
@@ -608,11 +593,11 @@ body { margin: 0; }
 </footer>
 
 <script>
-const ORDER = ["s1", "s2", "s3", "s4"];
-const RUN = {}, BY = { s1: [], s2: [], s3: [], s4: [] };
+const ORDER = ["s1", "s2", "s3"];
+const RUN = {}, BY = { s1: [], s2: [], s3: [] };
 const TARGET = { s1: ["R1"], s2: ["R3"], s3: ["R4", "R5"] };
 const FEATURED = { s1: "s1-20261015-235102", s2: "s2-20261016-005612", s3: "s3-20261016-011114" };
-const state = { tab: "s1", run: {}, focus: { s1: false, s2: false, s3: false, s4: false }, drawn: {}, ready: false };
+const state = { tab: "s1", run: {}, focus: { s1: false, s2: false, s3: false }, drawn: {}, ready: false };
 const SMOOTH = !matchMedia("(prefers-reduced-motion: reduce)").matches;
 const LIMIT = 280;
 const LONG = [];
