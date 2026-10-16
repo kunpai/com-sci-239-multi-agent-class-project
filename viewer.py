@@ -36,7 +36,7 @@ def evidence(prefix: list[dict], e: dict, why: str) -> list[tuple[int, str]]:
                 if turn is not None and p["seq"] > turn:
                     continue  # issued in the same LLM turn as the hire, so never seen
                 r = p["result"]
-                found[p["seq"]] = f"{me}'s most recent check of its own pool: ${r['api_usd']}, {r['free_mb']} MB free"
+                found[p["seq"]] = f"{me}'s last check of its own pool: ${r['api_usd']} left, {r['free_mb']:,} MB free"
                 break
             if not found and policy._hire(p) and (p["agent"] == me or policy._local_hire(p)):
                 found[p["seq"]] = f"{p['agent']} hired {p['args'].get('model')} after that check"
