@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import pytest
 
@@ -30,7 +31,8 @@ def test_hire_reserves_budget_from_hirer():
     assert round(ledger.left(ledger.AGENTS)["ceo"], 6) == 0.8
 
 
-@pytest.mark.parametrize("bad", [{"model": "nope"}, {"role": "boss"}, {"name": "Bad Name"}, {"name": "ceo"}])
+@pytest.mark.parametrize("bad", [{"model": "nope"}, {"role": "boss"}, {"name": "Bad Name"}, {"name": "ceo"},
+                                 {"budget_usd": -0.5}, {"budget_usd": float("inf")}, {"budget_usd": float("nan")}])
 def test_hire_rejects_structural_errors(bad):
     assert "error" in hire(**bad)
 
@@ -74,6 +76,21 @@ def test_fire_takes_the_whole_subtree():
     assert "error" in asyncio.run(server.fire_agent(caller="ceo", name="ceo"))
 
 
+def test_only_an_ancestor_can_fire():
+    hire(name="m1", role="manager", budget_usd=0.5)
+    hire(caller="m1", name="w2", budget_usd=0.1)
+    for caller, name in [("w2", "m1"), ("m1", "m1"), ("w2", "w2")]:
+        assert "error" in asyncio.run(server.fire_agent(caller=caller, name=name))
+    assert ledger.AGENTS["m1"]["live"] and ledger.AGENTS["w2"]["live"]
+    assert asyncio.run(server.fire_agent(caller="m1", name="w2")) == {"fired": ["w2"]}
+
+
+def test_a_fired_agent_cannot_hire():
+    hire(name="m1", role="manager")
+    asyncio.run(server.fire_agent(caller="ceo", name="m1"))
+    assert "error" in hire(caller="m1", name="w2")
+
+
 def test_check_usage_reports_money_and_memory(monkeypatch):
     async def sizes():
         return {"tiny": 50}
@@ -99,11 +116,16 @@ def test_read_file_stays_inside_data(monkeypatch, tmp_path):
         assert "error" in server.read_file(caller="m1", path=bad)
 
 
-def test_memory_get_and_add(monkeypatch, tmp_path):
+def test_memory_add_changes_only_this_runs_copy(monkeypatch, tmp_path):
+    (tmp_path / "memory.json").write_text('{"a": "1"}')
     monkeypatch.setattr(server, "DATA", tmp_path)
-    assert server.memory(caller="m1", action="get") == {"memories": {}}
+    server.load_memory()
+    assert server.memory(caller="m1", action="get") == {"memories": {"a": "1"}}
     assert server.memory(caller="m1", action="add", key="k", value="v") == {"saved": "k"}
-    assert server.memory(caller="m1", action="get") == {"memories": {"k": "v"}}
+    assert server.memory(caller="m1", action="get") == {"memories": {"a": "1", "k": "v"}}
+    assert json.loads((tmp_path / "memory.json").read_text()) == {"a": "1"}   # the seed file is untouched
+    server.load_memory()
+    assert server.memory(caller="m1", action="get") == {"memories": {"a": "1"}}
 
 
 def test_get_website_rejects_non_http():

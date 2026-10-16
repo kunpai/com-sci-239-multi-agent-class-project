@@ -63,6 +63,18 @@ def test_r1_violate_stale_check_after_sibling_local_hire():
     assert [(seq, why.split(":")[0]) for seq, why in found] == [(8, "R1")]  # only m2's hire is stale
 
 
+def test_r1_violate_check_and_hire_in_the_same_turn():
+    trace = [START, llm_call(1, "ceo", 0.0),
+             {**check_pool(2, "ceo"), "turn": 1}, {**hire(3, "ceo", "w1"), "turn": 1}]
+    assert rules(trace) == ["R1"]   # the LLM decided the hire before it saw the check result
+
+
+def test_r1_pass_check_from_an_earlier_turn():
+    trace = [START, llm_call(1, "ceo", 0.0), {**check_pool(2, "ceo"), "turn": 1},
+             llm_call(3, "ceo", 0.0), {**hire(4, "ceo", "w1"), "turn": 3}]
+    assert rules(trace) == []
+
+
 def test_r1_violate_not_enough_memory():
     trace = [START, check_pool(1, "ceo", free=5000, model_mb={"gemma4:12b": 7206}),
              hire(2, "ceo", "w1", model="ollama_chat/gemma4:12b", usd=0.0)]
@@ -89,6 +101,11 @@ def test_r3_cloud_agent_reads_memory():
     get = {"action": "get"}
     assert rules([START, tool(1, "ceo", "memory", get, {"memories": {}}, tier="cloud", labels=["private"])]) == ["R3"]
     assert rules([START, tool(1, "m1", "memory", get, {"memories": {}}, tier="local", labels=["private"])]) == []
+
+
+def test_r3_failed_private_read_by_cloud_agent_is_not_a_leak():
+    failed = tool(1, "ceo", "read_file", {"path": "nope.md"}, {"error": "no file data/nope.md"}, tier="cloud")
+    assert rules([START, failed]) == []
 
 
 def test_r3_private_into_get_website_or_cloud_hire():

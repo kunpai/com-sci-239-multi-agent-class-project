@@ -17,9 +17,23 @@ def test_live_children_hold_their_reservation():
     assert round(left["wkr"], 6) == 0.08
 
 
-def test_fired_child_holds_only_what_it_spent():
-    left = ledger.left(accounts(mgr={"live": False}))
-    assert round(left["ceo"], 6) == 0.85     # 1.0 - 0.1 - 0.05
+def test_fired_subtree_holds_everything_it_spent():
+    left = ledger.left(accounts(mgr={"live": False}, wkr={"live": False}))
+    assert round(left["ceo"], 6) == 0.83     # 1.0 - 0.1 - (0.05 by mgr + 0.02 by wkr): spend below is not refunded
+
+
+def test_fire_does_not_refund_spend_below():
+    events = [
+        {"kind": "start", "budget_usd": 0.5},
+        {"kind": "tool", "agent": "ceo", "name": "hire_agent",
+         "args": {"name": "m1", "budget_usd": 0.3}, "result": {"hired": "m1"}},
+        {"kind": "tool", "agent": "m1", "name": "hire_agent",
+         "args": {"name": "w1", "budget_usd": 0.2}, "result": {"hired": "w1"}},
+        {"kind": "llm", "agent": "w1", "cost_usd": 0.15},
+        {"kind": "tool", "agent": "ceo", "name": "fire_agent",
+         "args": {"name": "m1"}, "result": {"fired": ["m1", "w1"]}},
+    ]
+    assert round(ledger.left(ledger.replay(events))["ceo"], 6) == 0.35
 
 
 def test_overspend_shows_as_negative():

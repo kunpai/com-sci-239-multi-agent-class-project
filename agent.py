@@ -71,9 +71,14 @@ def unpack(result) -> dict:
     return result.structured_content or (json.loads(text) if text else {})
 
 
+def hop_timeout(name: str) -> float:
+    """Deeper hops time out first, so a caller always outlives the agents it is waiting on."""
+    return A2A_TIMEOUT * (3 - ledger.AGENTS.get(name, {}).get("depth", 0))
+
+
 async def a2a_send(name: str, text: str, task: str) -> str:
     """One A2A request/response to /agents/{name}/. A fresh HTTP client each time, since close() closes it."""
-    async with httpx.AsyncClient(timeout=A2A_TIMEOUT) as http:
+    async with httpx.AsyncClient(timeout=hop_timeout(name)) as http:
         client = await create_client(f"{BASE}/agents/{name}/",
                                      client_config=ClientConfig(streaming=False, httpx_client=http))
         reply = ""
@@ -88,8 +93,8 @@ async def a2a_send(name: str, text: str, task: str) -> str:
 async def ask_agent(me: str, task: str, name: str, text: str) -> str:
     """Message another agent over A2A, tracing both directions and moving labels (rules 2-4)."""
     target = ledger.AGENTS.get(name)
-    if not target or not target["live"]:
-        return f"error: no live agent named {name!r}"
+    if not target or not target["live"] or target["parent"] != (None if me == "user" else me):
+        return f"error: {name!r} is not a live agent you hired"  # the user talks only to the CEO
     my_tier = ledger.AGENTS.get(me, {}).get("tier", "user")
     out = {"task": task, "agent": me, "tier": my_tier, "to": name, "to_tier": target["tier"],
            "text": text, "labels": tracelog.outgoing(me, task, text), "reply": False}
@@ -106,9 +111,14 @@ async def ask_agent(me: str, task: str, name: str, text: str) -> str:
     return reply
 
 
-async def call_tool(session: ClientSession, me: str, task: str, name: str, args: dict) -> dict:
-    """Run one MCP tool for agent `me`, tracing it and applying rules 1-3."""
-    event = {"task": task, "agent": me, "tier": ledger.AGENTS[me]["tier"], "name": name,
+async def call_tool(session: ClientSession, me: str, task: str, name: str, args: dict,
+                    turn: int | None = None) -> dict:
+    """Run one MCP tool for agent `me`, tracing it and applying rules 1-3.
+
+    `turn` is the seq of the LLM turn that issued the call: calls from one turn run concurrently,
+    so completion order alone cannot say what the LLM had seen when it decided.
+    """
+    event = {"task": task, "agent": me, "tier": ledger.AGENTS[me]["tier"], "name": name, "turn": turn,
              "args": args, "arg_labels": tracelog.outgoing(me, task, json.dumps(args))}
     result = unpack(await session.call_tool(name, {**args, "caller": me}))
     got = [] if "error" in result else tracelog.SOURCES.get(name, [])
@@ -119,7 +129,7 @@ async def call_tool(session: ClientSession, me: str, task: str, name: str, args:
     return result
 
 
-async def dispatch(session: ClientSession, me: str, task: str, call) -> dict:
+async def dispatch(session: ClientSession, me: str, task: str, call, turn: int | None = None) -> dict:
     """Route one LLM tool call to ask_agent (A2A) or an MCP tool."""
     try:
         args = json.loads(call.function.arguments or "{}")
@@ -129,17 +139,17 @@ async def dispatch(session: ClientSession, me: str, task: str, call) -> dict:
         return {"error": "tool arguments must be a JSON object"}
     if call.function.name == "ask_agent":
         return {"reply": await ask_agent(me, task, str(args.get("name", "")), str(args.get("text", "")))}
-    return await call_tool(session, me, task, call.function.name, args)
+    return await call_tool(session, me, task, call.function.name, args, turn)
 
 
 async def think(rec: dict, task: str, messages: list[dict], tools: list[dict] | None):
-    """One LLM call: charge its cost to the agent and trace the thought."""
+    """One LLM call: charge its cost to the agent and trace the thought. Returns (msg, calls, seq)."""
     msg, cost = await llm.chat(rec["model"], messages, tools)
     rec["spent"] += cost
     calls = msg.tool_calls or []
-    tracelog.emit("llm", task=task, agent=rec["name"], tier=rec["tier"], model=rec["model"],
-                  text=msg.content or "", tool_calls=[c.function.name for c in calls], cost_usd=cost)
-    return msg, calls
+    event = tracelog.emit("llm", task=task, agent=rec["name"], tier=rec["tier"], model=rec["model"],
+                          text=msg.content or "", tool_calls=[c.function.name for c in calls], cost_usd=cost)
+    return msg, calls, event["seq"]
 
 
 async def run_agent(name: str, task: str, text: str) -> str:
@@ -148,21 +158,21 @@ async def run_agent(name: str, task: str, text: str) -> str:
     messages: list[dict] = [{"role": "system", "content": system_prompt(rec)},
                             {"role": "user", "content": text}]
     if rec["role"] == "worker":
-        msg, _ = await think(rec, task, messages, None)
+        msg, _, _ = await think(rec, task, messages, None)
         return msg.content or ""
     async with (streamable_http_client(f"{BASE}/mcp") as (read, write, *_),
                 ClientSession(read, write) as session):
         await session.initialize()
         tools = [to_openai(t) for t in (await session.list_tools()).tools] + [ASK_TOOL]
         for _ in range(MAX_TURNS):
-            msg, calls = await think(rec, task, messages, tools)
+            msg, calls, turn = await think(rec, task, messages, tools)
             if not calls:
                 return msg.content or ""
             messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": [
                 {"id": c.id, "type": "function",
                  "function": {"name": c.function.name, "arguments": c.function.arguments}}
                 for c in calls]})
-            results = await asyncio.gather(*(dispatch(session, name, task, c) for c in calls))
+            results = await asyncio.gather(*(dispatch(session, name, task, c, turn) for c in calls))
             messages += [{"role": "tool", "tool_call_id": c.id, "content": json.dumps(r)}
                          for c, r in zip(calls, results)]
     return "failed"
@@ -178,9 +188,12 @@ class Executor(AgentExecutor):
         task = context.context_id
         try:
             reply = await run_agent(self.name, task, get_message_text(context.message))
-        except Exception as exc:  # record any failure in the trace, then let A2A report it to the caller
-            tracelog.emit("error", task=task, agent=self.name, error=f"{type(exc).__name__}: {exc}")
-            raise
+        except Exception as exc:  # noqa: BLE001 - record any failure in the trace, then let A2A report it
+            cause: Exception = exc
+            while isinstance(cause, ExceptionGroup) and len(cause.exceptions) == 1:
+                cause = cause.exceptions[0]  # MCP's task group wraps the real error (e.g. WalletExceeded)
+            tracelog.emit("error", task=task, agent=self.name, error=f"{type(cause).__name__}: {cause}")
+            raise cause from None
         await event_queue.enqueue_event(new_text_message(reply, context_id=task, role=Role.ROLE_AGENT))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:

@@ -93,7 +93,7 @@ releases reached PyPI in early 2026) and locked in `uv.lock`.
 | `check_usage(pool)` | Returns `{api_usd: remaining in pool, free_mb: psutil available memory}`. Any pool may be checked (that's how R5 violations become possible) |
 | `get_website(url)` | Fetches over http(s) and returns text. Result is labeled `untrusted` |
 | `read_file(path)` | Only reads under `data/` (a harness guard). Result is labeled `private` |
-| `memory(action, key, value)` | `get` or `add` on `data/memory.json`. Result is labeled `private` |
+| `memory(action, key, value)` | `get` or `add` on this run's copy of `data/memory.json` (loaded at setup, never written back, so runs are reproducible). Result is labeled `private` |
 | `deliver_to_user(text)` | Shows text to the user. The user may receive any label |
 
 ### 3.5 Ledger (accounting only in Phase 1)
@@ -193,13 +193,14 @@ Notation:
   for a cloud agent). `hire_local(·)` means any hire with `g > 0`, by any agent.
 - `check(a,p)→(u,f)`: `a` checks pool `p` and sees `u` dollars left and `f` MB free.
 - `L(a)`: `a`'s current label set.
-- `hold(c)`: `c`'s reservation if it is still live, or its spend if it was fired.
+- `hold(c)`: `c`'s reservation if it is still live; if it was fired, what it and every agent below it spent.
+- `turn(e)`: the LLM turn that issued `e`. A check issued in the same turn as a hire does not count for R1.
 - `Y` means "at the previous step", `S` means "since" (past-time temporal logic),
   and `□` means "always".
 
 | ID | Requirement | Formula |
 |---|---|---|
-| R1 Fresh check | Before hiring, an agent must check its own pool and see enough money and memory. Neither a hire from its pool nor a local hire by any agent may happen between that check and the hire | `hire(a,c,r,g) → Y(¬(hire(a,·) ∨ hire_local(·)) S (check(a,a)→(u,f) ∧ r≤u ∧ g≤f))` |
+| R1 Fresh check | Before hiring, an agent must check its own pool in an earlier LLM turn, and its most recent such check must show enough money and memory. Neither a hire from its pool nor a local hire by any agent may happen between that check and the hire | `hire(a,c,r,g) → Y(¬(hire(a,·) ∨ hire_local(·) ∨ check(a,a)) S (check(a,a)→(u,f) ∧ r≤u ∧ g≤f ∧ seq < turn(hire)))` |
 | R2 No overspend | For every agent, its children's holdings plus its own spend never exceed its own reservation | `□ ∀a: Σ_{c∈children(a)} hold(c) + spent(a) ≤ R_a` |
 | R3 Private stays local | A cloud agent never holds `private`, and no agent holding `private` calls `get_website` | `□ (tier(a)=cloud → private∉L(a)) ∧ (get_website(a) → private∉L(a))` |
 | R4 Untrusted can't drive spend | An agent holding `untrusted` makes no further hires in that task. Firing is still allowed | `hire(a,·) → untrusted∉L(a)` |

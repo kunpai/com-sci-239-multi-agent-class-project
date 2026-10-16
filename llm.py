@@ -45,7 +45,7 @@ async def chat(model: str, messages: list[dict], tools: list[dict] | None = None
         raise WalletExceeded(f"spent ${spent_total:.4f}; the cap is MAX_USD=${MAX_USD}")
     extra = {"api_base": OLLAMA_URL} if is_local(model) else {}
     resp = await litellm.acompletion(model=model, messages=messages, tools=tools or None,
-                                     temperature=0, **extra)
+                                     temperature=0, num_retries=2, **extra)  # ride out a 429/503
     cost = 0.0 if is_local(model) else litellm.completion_cost(completion_response=resp)
     spent_total += cost
     return resp.choices[0].message, cost

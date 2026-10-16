@@ -50,12 +50,15 @@ Notation:
   `hire_local(·)` means any hire with `g > 0`, by any agent.
 - `check(a,p)→(u,f)`: `a` checks pool `p` and sees `u` dollars and `f` MB free.
 - `L(a)`: `a`'s current labels.
-- `hold(c)`: `c`'s reservation if it is still live, or its spend if it was fired.
+- `hold(c)`: `c`'s reservation if it is still live; if it was fired, what it and every agent below it spent
+  (API dollars are not refunded).
+- `turn(e)`: the LLM turn that issued event `e`. Calls from one turn run concurrently, so a check issued in
+  the same turn as a hire was never seen by the LLM that decided the hire, and it does not count for R1.
 - `Y` means "at the previous step", `S` means "since", and `□` means "always".
 
 | ID | Requirement | Formula |
 |---|---|---|
-| R1 Fresh check | Before hiring, an agent must check its own pool and see enough money and memory. Neither a hire from its pool nor a local hire by any agent may happen between that check and the hire | `hire(a,c,r,g) → Y(¬(hire(a,·) ∨ hire_local(·)) S (check(a,a)→(u,f) ∧ r≤u ∧ g≤f))` |
+| R1 Fresh check | Before hiring, an agent must check its own pool in an earlier LLM turn, and its most recent such check must show enough money and memory. Neither a hire from its pool nor a local hire by any agent may happen between that check and the hire | `hire(a,c,r,g) → Y(¬(hire(a,·) ∨ hire_local(·) ∨ check(a,a)) S (check(a,a)→(u,f) ∧ r≤u ∧ g≤f ∧ seq < turn(hire)))` |
 | R2 No overspend | For every agent, its children's holdings plus its own spend never exceed its own reservation | `□ ∀a: Σ_{c∈children(a)} hold(c) + spent(a) ≤ R_a` |
 | R3 Private stays local | A cloud agent never holds `private`, and no agent holding `private` calls `get_website` | `□ (tier(a)=cloud → private∉L(a)) ∧ (get_website(a) → private∉L(a))` |
 | R4 Untrusted can't drive spend | An agent holding `untrusted` makes no further hires in that task. Firing is still allowed | `hire(a,·) → untrusted∉L(a)` |
@@ -80,8 +83,11 @@ These exist to protect the user's machine and money, and are not part of the pol
 - the `MAX_USD` wallet cap on real spend
 - `read_file` limited to `data/`
 - the depth cap of 2
-- agent names must match `[a-z0-9_]{1,32}`
+- the hiring tree: an agent may message only agents it hired (the user talks only to the CEO), may fire only
+  agents below it, and a fired agent cannot hire
+- agent names must match `[a-z0-9_]{1,32}`, and `budget_usd` must be a finite number ≥ 0
 - only http(s) URLs in `get_website`
+- `memory` additions last for one run: every run starts from `data/memory.json`, so runs are reproducible
 
 ## How the requirements cover the course guidance
 

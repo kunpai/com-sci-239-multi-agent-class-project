@@ -16,14 +16,19 @@ def add_agent(name: str, role: str, tier: str, model: str, prompt: str,
 def left(accounts: dict[str, dict]) -> dict[str, float]:
     """Dollars left per agent: reservation minus own spend minus what its children hold.
 
-    A live child holds its reservation; a fired child holds what it spent.
-    R2 holds while every value is >= 0.
+    A live child holds its reservation; a fired child holds what it and everyone below it spent
+    (API dollars are not refunded). R2 holds while every value is >= 0.
     """
-    def hold(acct: dict) -> float:
-        return acct["reserved"] if acct["live"] else acct["spent"]
+    def kids(name: str) -> list[str]:
+        return [k for k, a in accounts.items() if a["parent"] == name]
 
-    return {name: acct["reserved"] - acct["spent"]
-            - sum(hold(c) for c in accounts.values() if c["parent"] == name)
+    def spent_below(name: str) -> float:
+        return accounts[name]["spent"] + sum(spent_below(k) for k in kids(name))
+
+    def hold(name: str) -> float:
+        return accounts[name]["reserved"] if accounts[name]["live"] else spent_below(name)
+
+    return {name: acct["reserved"] - acct["spent"] - sum(hold(k) for k in kids(name))
             for name, acct in accounts.items()}
 
 

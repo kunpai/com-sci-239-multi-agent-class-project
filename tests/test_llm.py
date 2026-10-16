@@ -44,6 +44,18 @@ def test_local_calls_cost_nothing_and_use_ollama(monkeypatch):
     assert cost == 0.0 and seen["api_base"] == llm.OLLAMA_URL and seen["temperature"] == 0
 
 
+def test_chat_retries_transient_provider_errors(monkeypatch):
+    seen = {}
+
+    async def fake_acompletion(**kwargs):
+        seen.update(kwargs)
+        return fake_response()
+    monkeypatch.setattr(llm.litellm, "acompletion", fake_acompletion)
+    monkeypatch.setattr(llm, "spent_total", 0.0)
+    asyncio.run(llm.chat("ollama_chat/qwen3.5:4b", []))
+    assert seen["num_retries"] == 2
+
+
 def test_wallet_cap_stops_all_further_calls(monkeypatch):
     calls = []
 

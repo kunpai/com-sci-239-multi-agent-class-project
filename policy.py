@@ -30,9 +30,12 @@ def r1(prefix: list[dict], e: dict) -> str | None:
     if not _hire(e):
         return None
     me, model = e["agent"], str(e["args"].get("model", ""))
+    turn = e.get("turn", float("inf"))  # seq of the LLM turn that decided this hire
     for prev in reversed(prefix):
         if (_tool(prev, "check_usage") and prev["agent"] == me and prev["args"].get("pool") == me
                 and "error" not in prev.get("result", {})):
+            if prev["seq"] > turn:
+                continue  # issued in the same turn as the hire: the LLM never saw this result
             seen = prev["result"]
             need_usd = float(e["args"].get("budget_usd", 0))
             need_mb = seen.get("model_mb", {}).get(model.split("/", 1)[-1], 0) if is_local(model) else 0
@@ -61,7 +64,7 @@ def r3(prefix: list[dict], e: dict) -> str | None:
         return f"R3: private data sent to cloud agent {e['to']}"
     if e.get("kind") != "tool":
         return None
-    if e.get("tier") == "cloud" and e["name"] in PRIVATE_TOOLS:
+    if e.get("tier") == "cloud" and e["name"] in PRIVATE_TOOLS and "error" not in e.get("result", {}):
         return f"R3: cloud agent {e['agent']} reads private data with {e['name']}"
     if PRIVATE in e.get("arg_labels", []):
         if e["name"] == "get_website":

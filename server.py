@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -25,6 +26,7 @@ import tracelog
 DATA = Path(__file__).parent / "data"
 MODELS = [m.strip() for m in os.environ.get("MODELS", "ollama_chat/qwen3.5:4b").split(",") if m.strip()]
 MAX_DEPTH = 2
+MEMORY: dict[str, str] = {}  # this run's copy of data/memory.json (see load_memory)
 
 mcp = MCPServer("hashiru-lite")
 app = mcp.streamable_http_app()  # MCP at /mcp; agent endpoints and /web join this same Starlette app
@@ -38,6 +40,10 @@ app.router.routes.append(Mount("/web", app=StaticFiles(directory=DATA / "web")))
 async def hire_agent(caller: str, name: str, role: str, model: str, prompt: str, budget_usd: float) -> dict:
     boss = ledger.AGENTS[caller]
     depth = boss["depth"] + 1
+    if not boss["live"]:
+        return {"error": f"{caller} has been fired and cannot hire"}
+    if not (math.isfinite(budget_usd) and budget_usd >= 0):
+        return {"error": "budget_usd must be a finite number >= 0"}
     if model not in MODELS:
         return {"error": f"unknown model {model!r}; choose from {MODELS}"}
     if role not in ("manager", "worker"):
@@ -60,9 +66,9 @@ async def hire_agent(caller: str, name: str, role: str, model: str, prompt: str,
 
 @mcp.tool()
 async def fire_agent(caller: str, name: str) -> dict:
-    """Fire an agent and every agent it hired. Unspent money goes back to its hirer."""
-    if name == "ceo" or not ledger.AGENTS.get(name, {}).get("live"):
-        return {"error": f"no live agent named {name!r}"}
+    """Fire an agent you hired (directly or below you) and every agent it hired. Unspent money goes back."""
+    if not ledger.AGENTS.get(name, {}).get("live") or caller not in ancestors(name):
+        return {"error": f"{name!r} is not a live agent below you"}
     fired = subtree(name)
     for n in fired:
         ledger.AGENTS[n]["live"] = False
@@ -104,13 +110,17 @@ def read_file(caller: str, path: str) -> dict:
 @mcp.tool()
 def memory(caller: str, action: str, key: str = "", value: str = "") -> dict:
     """Saved user memories. action 'get' returns all of them; 'add' saves value under key."""
-    path = DATA / "memory.json"
-    saved = json.loads(path.read_text()) if path.exists() else {}
     if action == "add":
-        saved[key] = value
-        path.write_text(json.dumps(saved, indent=2))
+        MEMORY[key] = value
         return {"saved": key}
-    return {"memories": saved}
+    return {"memories": dict(MEMORY)}
+
+
+def load_memory() -> None:
+    """Each run starts from data/memory.json; 'add' changes only this run's copy, so runs are reproducible."""
+    path = DATA / "memory.json"
+    MEMORY.clear()
+    MEMORY.update(json.loads(path.read_text()) if path.exists() else {})
 
 
 @mcp.tool()
@@ -139,6 +149,12 @@ def mount(rec: dict) -> None:
 
 def unmount(name: str) -> None:
     app.router.routes[:] = [r for r in app.router.routes if getattr(r, "path", None) != f"/agents/{name}"]
+
+
+def ancestors(name: str) -> list[str]:
+    """Everyone above an agent: its hirer, its hirer's hirer, ... up to the CEO."""
+    parent = ledger.AGENTS[name]["parent"]
+    return [parent, *ancestors(parent)] if parent else []
 
 
 def subtree(name: str) -> list[str]:
@@ -192,6 +208,7 @@ def setup(task: str, budget_usd: float, ceo_model: str, trace_path: Path | None)
     for name in list(ledger.AGENTS):
         unmount(name)
     ledger.AGENTS.clear()
+    load_memory()
     tier = "local" if llm.is_local(ceo_model) else "cloud"
     tracelog.start(trace_path, task=task, budget_usd=budget_usd, models=MODELS,
                    agents={"ceo": {"tier": tier, "depth": 0, "model": ceo_model}})
