@@ -108,13 +108,21 @@ def _r1(prefix: list[dict], e: dict) -> str:
     stale = next((p for p in reversed(prefix) if p["seq"] > check["seq"] and policy._hire(p)
                   and (p["agent"] == me or policy._local_hire(p))), None)
     if stale is None:
-        return f"{did}, which showed {' and '.join(short)}."
+        return (f"{did}, which showed {' and '.join(short)}. Nothing in between made that check stale: no agent loaded "
+                f"a model and {me}'s pool funded no other hire, so the check already said the hire did not fit, and "
+                f"{me} hired anyway.")
     if stale["agent"] == me:
-        why = f"But {me} made another hire from its pool at #{stale['seq']}, after that check, so the numbers it saw were out of date."
-    else:
-        why = (f"But {stale['agent']} loaded {_model(stale)} at #{stale['seq']}, "
-               f"after that check, so the free GPU memory {me} saw was out of date.")
-    return f"{did}. {why}" + (f" Even that check showed {' and '.join(short)}." if short else "")
+        return (f"{did}. But between that check and this hire, {me} itself hired {stale['args'].get('name')} at "
+                f"#{stale['seq']} from the same pool, so the numbers it saw were out of date."
+                + (f" Even that check showed {' and '.join(short)}." if short else ""))
+    used = seen.get("model_mb", {}).get(_model(stale), 0)
+    text = (f"{did}, which showed {seen['free_mb']:,} MB free. But between that check and this hire, "
+            f"{stale['agent']} loaded {_model(stale)}{f' ({used:,} MB)' if used else ''} at #{stale['seq']} on the "
+            f"same GPU, so the check was out of date.")
+    if short:
+        return text + f" Even before that, the check showed {' and '.join(short)}."
+    left = seen["free_mb"] - used
+    return text + (f" That left about {left:,} MB free for a model that needs {need_mb:,} MB." if used and left < need_mb else "")
 
 
 def _r2(prefix: list[dict], e: dict, why: str) -> str:
