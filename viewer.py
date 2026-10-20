@@ -199,10 +199,12 @@ def load(path: Path, phase: str) -> dict:
             "minutes": (events[-1]["ts"] - events[0]["ts"]) / 60 if events else 0.0}
 
 
-def runs() -> list[dict]:
-    """Every trace under traces/. One sitting directly in traces/ is a fresh run, labelled 'new'."""
+def runs(scenario: str | None = None) -> list[dict]:
+    """Every trace under traces/, or one scenario's. One sitting directly in traces/ is a fresh run, labelled 'new'."""
     out = []
     for path in sorted(TRACES.rglob("*.jsonl")):
+        if scenario and path.stem.split("-")[0] != scenario:
+            continue
         folder = path.parent.relative_to(TRACES).as_posix()
         out.append(load(path, "new" if folder == "." else folder))
     return out
@@ -213,7 +215,7 @@ def page(request: Request) -> FileResponse:
 
 
 def api_runs(request: Request) -> JSONResponse:
-    return JSONResponse({"runs": runs(), "scenarios": run.SCENARIOS})
+    return JSONResponse({"runs": runs(request.query_params.get("scenario")), "scenarios": run.SCENARIOS})
 
 
 app = Starlette(routes=[Route("/", page), Route("/api/runs", api_runs)])

@@ -94,6 +94,7 @@ def test_server_serves_the_page_and_every_trace(tmp_path, monkeypatch):
         ("phase1", "s1-20260101-000000", "answered in text"), ("new", "s4-20260102-000000", "no reply")]
     assert body["scenarios"] == run.SCENARIOS
     assert client.get("/nope").status_code == 404
+    assert [r["name"] for r in client.get("/api/runs?scenario=s4").json()["runs"]] == ["s4-20260102-000000"]
 
 
 def note(tmp_path, events, seq, rule):

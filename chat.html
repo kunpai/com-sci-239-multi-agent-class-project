@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HASHIRU-lite Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Same tokens as viewer.html, so the chat and the trace viewer read as one app. */
+:root {
+  --bg: #f2f5f8; --surface: #ffffff; --sunk: #e7ecf1; --fg: #15212c; --muted: #586776; --line: #d2dae2;
+  --accent: #1d5d8f; --accent-soft: #e2edf7;
+  --bad: #c3281e; --bad-bg: #fdebe9; --bad-line: #f0b3ad; --on-bad: #ffffff;
+  --priv: #6843b5; --priv-bg: #efe8fb;
+  --untr: #8f5b00; --untr-bg: #fbefd6;
+  --ok: #24724a; --ok-bg: #e3f2e9;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1217; --surface: #141b22; --sunk: #1b252e; --fg: #dce4eb; --muted: #94a3b1; --line: #2a3641;
+    --accent: #78b1e2; --accent-soft: #15283a;
+    --bad: #ff7a6c; --bad-bg: #351513; --bad-line: #6c2a23; --on-bad: #2a0b08;
+    --priv: #bba2f6; --priv-bg: #261c3c;
+    --untr: #f1b64c; --untr-bg: #31250c;
+    --ok: #6fd09a; --ok-bg: #11281b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1217; --surface: #141b22; --sunk: #1b252e; --fg: #dce4eb; --muted: #94a3b1; --line: #2a3641;
+  --accent: #78b1e2; --accent-soft: #15283a;
+  --bad: #ff7a6c; --bad-bg: #351513; --bad-line: #6c2a23; --on-bad: #2a0b08;
+  --priv: #bba2f6; --priv-bg: #261c3c;
+  --untr: #f1b64c; --untr-bg: #31250c;
+  --ok: #6fd09a; --ok-bg: #11281b;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 var(--f-body); }
+.wrap {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2 { font-family: var(--f-display); margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; font-stretch: 118%; }
+h2 { font-size: 1.1rem; font-weight: 720; font-stretch: 108%; }
+p { margin: 0; }
+a { color: var(--accent); }
+code { font-family: var(--f-mono); font-size: 0.88em; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eyebrow { font: 600 12px/1.4 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.meta { font: 12.5px/1.6 var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+
+.top { border-bottom: 1px solid var(--line); }
+.top .wrap { padding-block: 26px 18px; display: grid; gap: 8px; }
+
+.layout { display: grid; gap: 24px; padding-block: 22px 0; }
+@media (min-width: 980px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+  .side { position: sticky; top: 16px; }
+}
+.chat { display: grid; gap: 14px; min-width: 0; }
+.log { display: grid; gap: 12px; }
+
+.welcome { border: 1px dashed var(--line); border-radius: 8px; padding: 18px; display: grid; gap: 12px; background: var(--surface); }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.example {
+  font: 13.5px/1.4 var(--f-body); text-align: left; padding: 7px 11px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); cursor: pointer; max-width: 100%;
+}
+.example:hover { border-color: var(--accent); }
+
+.bubble { max-width: min(680px, 88%); padding: 10px 14px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble .from { font: 600 11.5px var(--f-mono); color: var(--muted); margin-bottom: 2px; white-space: normal; }
+.bubble.you { justify-self: end; background: var(--accent); color: var(--surface); border-bottom-right-radius: 3px; }
+.bubble.ceo { justify-self: start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+.bubble.deliver { justify-self: start; background: var(--accent-soft); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+.bubble.err { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad); }
+
+/* What the agents did during one turn: one line per hire, message, tool call or violation. */
+.act { justify-self: stretch; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13.5px; }
+.act summary {
+  cursor: pointer; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+  font: 600 12.5px var(--f-mono); color: var(--muted); list-style-position: inside;
+}
+.act summary a { margin-left: auto; font-weight: 500; }
+.act ol { list-style: none; margin: 0; padding: 4px 0 8px; border-top: 1px solid var(--line); max-height: 46vh; overflow: auto; }
+.act li { display: grid; grid-template-columns: 3.6ch minmax(0, 1fr); gap: 10px; padding: 3px 12px; overflow-wrap: anywhere; }
+.act li.bad { background: var(--bad-bg); box-shadow: inset 3px 0 0 var(--bad); color: var(--bad); font-weight: 600; cursor: help; }
+.sq { font: 600 12px var(--f-mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.q { color: var(--muted); }
+.badtxt, .errtxt { color: var(--bad); }
+.pulse { color: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+
+.tier { font: 500 11px var(--f-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
+.tier.cloud { color: var(--accent); border-color: var(--accent); }
+.r { font: 700 11.5px var(--f-mono); padding: 1px 6px; border-radius: 3px; background: var(--bad); color: var(--on-bad); }
+.lab { font: 600 12px var(--f-mono); padding: 0 5px; border-radius: 3px; border: 1px solid; white-space: nowrap; }
+.lab.p { color: var(--priv); background: var(--priv-bg); }
+.lab.u { color: var(--untr); background: var(--untr-bg); }
+
+.composer {
+  position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end;
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom, 0px)); background: var(--bg); border-top: 1px solid var(--line);
+}
+.composer textarea {
+  font: 15px/1.45 var(--f-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; resize: vertical; min-height: 46px; max-height: 40vh; width: 100%;
+}
+.composer textarea:focus { border-color: var(--accent); outline: none; }
+.composer button {
+  font: 650 15px var(--f-display); font-stretch: 108%; padding: 11px 18px; border-radius: 8px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--surface); cursor: pointer;
+}
+.composer button:disabled, .composer textarea:disabled { opacity: 0.55; cursor: default; }
+.status { font-size: 13.5px; color: var(--muted); min-height: 1.4em; margin-top: -6px; }
+.status.err { color: var(--bad); font-weight: 600; }
+
+.side { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.tree, .tree ul { list-style: none; margin: 0; padding: 0; }
+.tree ul { margin-left: 9px; padding-left: 12px; border-left: 1px solid var(--line); }
+.tree li { padding: 5px 0 0; }
+.an { font-size: 14px; display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; }
+.an .mdl { font: 12px var(--f-mono); color: var(--muted); }
+.nums { font: 12px var(--f-mono); color: var(--muted); }
+.fired > .an, .fired > .nums { opacity: 0.5; }
+.fired > .an b { text-decoration: line-through; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow">HASHIRU-lite</p>
+    <h1>Chat with the CEO</h1>
+    <p class="meta" id="meta">Connecting to chat.py…</p>
+  </div>
+</header>
+
+<main class="wrap layout">
+  <section class="chat" aria-label="Conversation">
+    <div class="log" id="log"></div>
+    <form class="composer" id="composer">
+      <textarea id="text" rows="2" placeholder="Message the CEO… (Enter to send, Shift+Enter for a new line)" aria-label="Message the CEO"></textarea>
+      <button type="submit" id="sendbtn">Send</button>
+    </form>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <aside class="side" aria-label="Agents">
+    <h2>Agents</h2>
+    <p class="meta" id="money"></p>
+    <ul class="tree" id="tree"></ul>
+  </aside>
+</main>
+
+<script>
+const VIEWER = "http://127.0.0.1:8239/#chat";
+const $ = id => document.getElementById(id);
+const box = $("text"), btn = $("sendbtn");
+let S = null, drawn = "", sending = false, sendError = "", lost = "";
+const opened = {};  // turn index -> whether its activity block is open, once the user toggles it
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function usd(x) { return "$" + Number(x || 0).toFixed(4); }
+function mb(x) { return Number(x || 0).toLocaleString() + " MB"; }
+function short(model) { return String(model).replace(/^ollama(_chat)?\//, ""); }
+function tier(t) { return `<span class="tier ${esc(t)}">${esc(t)}</span>`; }
+function labs(list) { return (list || []).map(l => `<span class="lab ${l === "private" ? "p" : "u"}">${esc(l)}</span>`).join(" "); }
+function clip(s, n = 180) { s = String(s ?? "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) + "…" : s; }
+function plural(n, w) { return `${n} ${w}${n === 1 ? "" : "s"}`; }
+function ago(ts) { const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; }
+function since(ts) { return `<span data-since="${Number(ts)}">${ago(ts)}</span>`; }  // ticked in place by loop()
+
+/* Messages still waiting for their reply, so a slow agent shows as "waiting", not as a frozen page. */
+function waiting(evs) {
+  const open = [];
+  for (const e of evs) {
+    if (e.kind === "error") {  // a failed agent sends no reply; its caller has moved on
+      const i = open.findIndex(m => m.to === e.agent);
+      if (i >= 0) open.splice(i, 1);
+      continue;
+    }
+    if (e.kind !== "msg" || e.agent === "user" || e.to === "user") continue;
+    if (!e.reply) open.push(e);
+    else {
+      const i = open.findIndex(m => m.agent === e.to && m.to === e.agent);
+      if (i >= 0) open.splice(i, 1);
+    }
+  }
+  return open;
+}
+
+/* One activity line for an event, or null for events the chat already shows (or that are noise, like llm). */
+function line(e) {
+  const a = `<b>${esc(e.agent)}</b>`;
+  if (e.kind === "tool") {
+    const g = e.args || {}, r = e.result || {};
+    if (r.error) return `<span class="errtxt">${a} ${esc(e.name)} failed: ${esc(clip(r.error))}</span>`;
+    switch (e.name) {
+      case "check_usage": return `${a} checked pool <b>${esc(g.pool)}</b>: ${usd(r.api_usd)} left, ${mb(r.free_mb)} free`;
+      case "hire_agent": return `${a} hired <b>${esc(r.hired)}</b> · ${esc(g.role)} ${tier(r.tier)} ${esc(short(g.model))} · ${usd(r.reserved_usd)}${r.gpu_mb ? " · " + mb(r.gpu_mb) : ""}`;
+      case "fire_agent": return `${a} fired ${(r.fired || [g.name]).map(n => `<b>${esc(n)}</b>`).join(", ")}`;
+      case "get_website": return `${a} fetched ${esc(g.url)} ${labs(e.labels)}`;
+      case "read_file": return `${a} read ${esc(g.path)} ${labs(e.labels)}`;
+      case "memory": return `${a} used memory: ${esc(g.action)}${g.key ? " " + esc(g.key) : ""} ${labs(e.labels)}`;
+      case "deliver_to_user": return `${a} sent you a message directly`;
+      default: return `${a} called ${esc(e.name)}`;
+    }
+  }
+  if (e.kind === "msg") {
+    if (e.agent === "user" || e.to === "user") return null;  // these are the chat bubbles
+    const carried = e.labels && e.labels.length ? " " + labs(e.labels) : "";
+    return `${a} → <b>${esc(e.to)}</b>${e.reply ? " replied" : ""}${carried}: <span class="q">“${esc(clip(e.text))}”</span>`;
+  }
+  if (e.kind === "label") return `${a} now holds ${labs(e.labels)}`;
+  if (e.kind === "error") return `<span class="errtxt">${a} failed: ${esc(clip(e.error))}</span>`;
+  return null;
+}
+
+function turnHTML(t, i, last) {
+  const end = S.ended && last ? Infinity : t.end ?? Infinity;  // a timed-out CEO keeps working after the chat ends
+  const evs = S.events.filter(e => e.seq >= t.start && e.seq < end);
+  const vs = S.violations.filter(v => v.seq >= t.start && v.seq < end);
+  const cost = evs.reduce((sum, e) => sum + (e.kind === "llm" ? e.cost_usd || 0 : 0), 0);
+  let rows = "";
+  for (const e of evs) {
+    const l = line(e);
+    if (l) rows += `<li><span class="sq">${e.seq}</span><span>${l}</span></li>`;
+    for (const v of vs.filter(v => v.seq === e.seq)) {
+      rows += `<li class="bad" title="${esc(v.note)}"><span class="sq">${e.seq}</span><span><span class="r">${esc(v.rule)}</span> ${esc(v.why)}</span></li>`;
+    }
+  }
+  const working = t.reply == null;
+  if (working) {
+    for (const m of waiting(evs)) {
+      rows += `<li><span class="sq"></span><span class="pulse"><b>${esc(m.to)}</b> is working on ${esc(m.agent)}'s message (${since(m.ts)} so far)</span></li>`;
+    }
+  }
+  const open = opened[i] ?? (working || last || vs.length > 0);
+  const head = `turn ${i + 1} · ${plural(evs.length, "event")} · ${usd(cost)}`
+    + (vs.length ? ` · <span class="badtxt">${plural(vs.length, "violation")}</span>` : "")
+    + (working ? ` · <span class="pulse">working, ${since(S.events.find(e => e.seq === t.start)?.ts ?? Date.now() / 1000)}</span>` : "");
+  const delivered = evs.filter(e => e.kind === "tool" && e.name === "deliver_to_user" && !(e.result || {}).error)
+    .map(e => `<div class="bubble deliver"><div class="from">${esc(e.agent)} → you</div>${esc((e.args || {}).text)}</div>`).join("");
+  const reply = working ? "" : `<div class="bubble ceo${t.reply.startsWith("error: ") ? " err" : ""}"><div class="from">ceo</div>${esc(t.reply)}</div>`;
+  return `<div class="bubble you">${esc(t.text)}</div>
+    <details class="act" data-i="${i}"${open ? " open" : ""}><summary>${head}<a href="${VIEWER}" target="_blank" rel="noopener">full trace →</a></summary>
+      <ol>${rows || `<li><span></span><span class="muted">Waiting for the first step…</span></li>`}</ol></details>
+    ${delivered}${reply}`;
+}
+
+function treeHTML(a) {
+  const kids = S.agents.filter(k => k.parent === a.name);
+  const nums = !a.live ? `fired · spent ${usd(a.spent)}`
+    : `${usd(S.left_usd[a.name])} left of ${usd(a.reserved)}${a.gpu_mb ? " · " + mb(a.gpu_mb) : ""}`;
+  return `<li class="${a.live ? "" : "fired"}">
+    <div class="an"><b>${esc(a.name)}</b> ${tier(a.tier)} <span class="mdl">${esc(a.role)} · ${esc(short(a.model))}</span></div>
+    <div class="nums">${nums}</div>
+    ${kids.length ? `<ul>${kids.map(treeHTML).join("")}</ul>` : ""}</li>`;
+}
+
+function draw() {
+  const sig = JSON.stringify([S.events.length, S.violations.length, S.turns.map(t => t.reply), S.busy, S.ended, sendError, lost, sending]);
+  if (sig === drawn) return;
+  drawn = sig;
+  const pinned = innerHeight + scrollY >= document.documentElement.scrollHeight - 40;
+
+  $("meta").innerHTML = `${esc(S.task)} · trace <code>${esc(S.trace)}</code> · <a href="${VIEWER}" target="_blank" rel="noopener">full trace in the viewer →</a>`;
+  if (!S.turns.length) {
+    $("log").innerHTML = `<div class="welcome">
+      <p>Ask the CEO for anything. It hires managers and workers, local or cloud, and every hire, message and tool call shows up here as it happens. The full trace, with R1–R5 violations marked, is in the viewer's Chat tab.</p>
+      <p class="muted">Each message spends real API money, usually about a cent. Try one of these:</p>
+      <div class="examples">${(S.examples || []).map(x => `<button type="button" class="example">${esc(x)}</button>`).join("")}</div></div>`;
+  } else {
+    const keep = {};  // each activity list's scroll position; Infinity means "stay at the newest step"
+    for (const ol of document.querySelectorAll("details.act ol")) {
+      keep[ol.parentElement.dataset.i] = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 20 ? Infinity : ol.scrollTop;
+    }
+    $("log").innerHTML = S.turns.map((t, i) => turnHTML(t, i, i === S.turns.length - 1)).join("");
+    for (const ol of document.querySelectorAll("details.act ol")) {
+      const k = keep[ol.parentElement.dataset.i];
+      if (k !== undefined) ol.scrollTop = k === Infinity ? ol.scrollHeight : k;
+    }
+  }
+
+  const ceo = S.agents.find(a => a.name === "ceo");
+  const spent = S.agents.reduce((sum, a) => sum + a.spent, 0);
+  $("money").textContent = ceo ? `budget ${usd(ceo.reserved)} · spent ${usd(spent)} · ceo has ${usd(S.left_usd.ceo)} left` : "";
+  $("tree").innerHTML = ceo ? treeHTML(ceo) : "";
+
+  const busy = S.busy || sending;
+  box.disabled = btn.disabled = busy || S.ended;
+  const status = $("status");
+  status.className = "status" + (lost || sendError || S.ended ? " err" : "");
+  status.textContent = lost ? `Lost the connection to chat.py (${lost}). Is it still running?`
+    : sendError ? sendError
+    : S.ended ? "This chat ended because a turn failed. Restart chat.py to start a new one."
+    : busy ? "The CEO is working. Each step shows up above as it happens."
+    : "";
+  if (pinned) scrollTo({ top: document.documentElement.scrollHeight });
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/chat/state", { cache: "no-store" });
+    if (!res.ok) throw new Error(`the server answered ${res.status}`);
+    S = await res.json();
+    lost = "";
+  } catch (err) {
+    lost = err.message;
+    if (!S) { $("meta").textContent = `Could not reach chat.py (${err.message}). Start it with: uv run --env-file .env chat.py`; return; }
+  }
+  draw();
+}
+
+async function loop() {
+  await refresh();
+  for (const el of document.querySelectorAll("[data-since]")) el.textContent = ago(Number(el.dataset.since));
+  setTimeout(loop, S && S.busy ? 700 : 2000);
+}
+
+$("composer").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const text = box.value.trim();
+  if (!text || sending || !S || S.busy || S.ended) return;
+  sending = true; sendError = ""; draw();
+  try {
+    const res = await fetch("/chat/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `the server answered ${res.status}`);
+    box.value = "";
+  } catch (err) {
+    sendError = `Not sent: ${err.message}`;
+  }
+  sending = false;
+  await refresh();
+  scrollTo({ top: document.documentElement.scrollHeight });
+});
+
+box.addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); $("composer").requestSubmit(); }
+});
+document.addEventListener("click", ev => {
+  const ex = ev.target.closest(".example");
+  if (ex) { box.value = ex.textContent; box.focus(); return; }
+  const sum = ev.target.closest("details.act > summary");
+  if (sum && !ev.target.closest("a")) opened[sum.parentElement.dataset.i] = !sum.parentElement.open;  // click runs before the toggle
+});
+
+loop();
+</script>
+</body>
+</html>
