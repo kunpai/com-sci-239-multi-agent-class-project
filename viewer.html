@@ -512,7 +512,8 @@ body { margin: 0; }
       <div class="tabs" role="tablist" aria-label="Scenarios">
         <button type="button" class="tab" role="tab" id="tab-s1" aria-controls="panel-s1" data-scn="s1" aria-selected="true">S1 GPU race <small>R1 · <span data-rate="s1">…</span></small></button>
         <button type="button" class="tab" role="tab" id="tab-s2" aria-controls="panel-s2" data-scn="s2" aria-selected="false" tabindex="-1">S2 Private relay <small>R3 · <span data-rate="s2">…</span></small></button>
-        <button type="button" class="tab" role="tab" id="tab-s3" aria-controls="panel-s3" data-scn="s3" aria-selected="false" tabindex="-1">S3 Injected page <small>R4, R5 · <span data-rate="s3">…</span></small></button>      </div>
+        <button type="button" class="tab" role="tab" id="tab-s3" aria-controls="panel-s3" data-scn="s3" aria-selected="false" tabindex="-1">S3 Injected page <small>R4, R5 · <span data-rate="s3">…</span></small></button>
+        <button type="button" class="tab" role="tab" id="tab-chat" aria-controls="panel-chat" data-scn="chat" aria-selected="false" tabindex="-1">Chat <small>live</small></button>      </div>
 
       <div class="panel" role="tabpanel" id="panel-s1" aria-labelledby="tab-s1">
         <div class="explore">
@@ -580,6 +581,10 @@ body { margin: 0; }
           <div class="viewer" data-scn="s3"><p class="note">Loading traces…</p></div>
         </div>
       </div>
+
+      <div class="panel" role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" hidden>
+        <div class="viewer" data-scn="chat"><p class="note">Loading traces…</p></div>
+      </div>
     </div>
   </div>
 </section>
@@ -593,14 +598,14 @@ body { margin: 0; }
 </footer>
 
 <script>
-const ORDER = ["s1", "s2", "s3"];
-const RUN = {}, BY = { s1: [], s2: [], s3: [] };
+const ORDER = ["s1", "s2", "s3", "chat"];
+const RUN = {}, BY = { s1: [], s2: [], s3: [], chat: [] };
 const TARGET = { s1: ["R1"], s2: ["R3"], s3: ["R4", "R5"] };
 const FEATURED = { s1: "s1-20261015-235102", s2: "s2-20261016-005612", s3: "s3-20261016-011114" };
-const state = { tab: "s1", run: {}, focus: { s1: false, s2: false, s3: false }, drawn: {}, ready: false };
+const state = { tab: "s1", run: {}, focus: { s1: false, s2: false, s3: false, chat: false }, drawn: {}, ready: false, chatSig: "" };
 const SMOOTH = !matchMedia("(prefers-reduced-motion: reduce)").matches;
 const LIMIT = 280;
-const LONG = [];
+const LONG = [], LONGK = new Map();  // LONGK: html -> index, so live Chat redraws reuse entries
 const HL_TEST = /CANARY-|IMPORTANT NOTE FOR AI ASSISTANTS/;
 
 function esc(s) {
@@ -616,7 +621,9 @@ function jstr(v) {
   if (v === "private") return `<span class="js lp">${esc(raw)}</span>`;
   if (v === "untrusted") return `<span class="js lu">${esc(raw)}</span>`;
   if (raw.length <= LIMIT || HL_TEST.test(raw)) return `<span class="js">${hl(esc(raw))}</span>`;
-  const k = LONG.push(hl(esc(raw))) - 1;
+  const html = hl(esc(raw));
+  if (!LONGK.has(html)) LONGK.set(html, LONG.push(html) - 1);
+  const k = LONGK.get(html);
   return `<span class="js">${esc(raw.slice(0, LIMIT))}…</span><button type="button" class="more" data-k="${k}">+${(raw.length - LIMIT).toLocaleString()} chars</button>`;
 }
 function j(v) {
@@ -677,6 +684,10 @@ function plural(n, w) { return `${n} ${w}${n === 1 ? "" : "s"}`; }
 function notes(vs) { return vs.map(x => x.note).join("\n\n"); }
 
 function runLabel(r) {
+  if (r.scenario === "chat") {  // chat-YYYYMMDD-HHMMSS
+    const n = r.name;
+    return `chat ${n.slice(9, 11)}/${n.slice(11, 13)} ${n.slice(-6, -4)}:${n.slice(-4, -2)}`;
+  }
   const list = BY[r.scenario];
   const i = list.filter(x => x.phase === r.phase).indexOf(r) + 1;
   return new Set(list.map(x => x.phase)).size > 1 ? `${esc(r.phase)} · run ${i}` : `Run ${i}`;
@@ -689,7 +700,9 @@ function drawViewer(scn) {
   const r = RUN[state.run[scn]];
   state.drawn[scn] = state.run[scn];
   if (!r) {
-    box.innerHTML = `<p class="note">No ${scn.toUpperCase()} traces yet. Run <code>uv run --env-file .env run.py ${scn}</code>, then reload this page.</p>`;
+    box.innerHTML = scn === "chat"
+      ? `<p class="note">No chats yet. Start one with <code>uv run --env-file .env chat.py</code> and open <a href="http://127.0.0.1:9100/chat" target="_blank" rel="noopener">127.0.0.1:9100/chat</a>. Its trace shows up here as the agents work.</p>`
+      : `<p class="note">No ${scn.toUpperCase()} traces yet. Run <code>uv run --env-file .env run.py ${scn}</code>, then reload this page.</p>`;
     return;
   }
   const focus = state.focus[scn] && r.violations.length > 0;
@@ -751,18 +764,54 @@ function jump(scn, runName, seq) {
   setTimeout(() => row.classList.remove("flash"), 1800);
 }
 
+function index(r) {
+  RUN[r.name] = r;
+  r.vmap = {}; r.emap = {};
+  for (const v of r.violations) {
+    (r.vmap[v.seq] ||= []).push(v);
+    for (const [s, t] of v.evidence) (r.emap[s] ||= []).push([v.seq, v.rule, t]);
+  }
+}
+
+/* The Chat tab follows chat traces while they are written (chat.py appends every event to the file as it
+   happens). It moves on to a newer chat unless you picked an older one, and keeps your scroll position. */
+function followChats(chats) {
+  const following = !state.run.chat || state.run.chat === BY.chat.at(-1)?.name;
+  BY.chat.length = 0;
+  for (const r of chats) { index(r); BY.chat.push(r); }
+  BY.chat.sort((a, b) => a.name.localeCompare(b.name));  // newest last, whatever folder it sits in
+  if (following) state.run.chat = BY.chat.at(-1)?.name;
+  const r = RUN[state.run.chat];
+  const sig = `${BY.chat.length}|${state.run.chat}|${r ? r.events.length : 0}`;
+  if (sig === state.chatSig) return;
+  state.chatSig = sig;
+  const old = document.querySelector('.viewer[data-scn="chat"] .pane');
+  const atEnd = !old || old.scrollTop + old.clientHeight >= old.scrollHeight - 40;
+  const top = old ? old.scrollTop : 0;
+  drawViewer("chat");
+  const pane = document.querySelector('.viewer[data-scn="chat"] .pane');
+  if (pane) pane.scrollTop = atEnd ? pane.scrollHeight : top;
+}
+
+async function pollChats() {
+  if (state.ready && state.tab === "chat" && !document.hidden) {
+    try {
+      const res = await fetch("/api/runs?scenario=chat", { cache: "no-store" });
+      if (res.ok) followChats((await res.json()).runs);
+    } catch (err) { /* the viewer may be restarting; the next poll tries again */ }
+  }
+  setTimeout(pollChats, 2000);
+}
+
 function boot(data) {
   for (const r of data.runs) {
     if (!BY[r.scenario]) continue;  // e.g. the 'hello' wiring check
-    RUN[r.name] = r;
+    index(r);
     BY[r.scenario].push(r);
-    r.vmap = {}; r.emap = {};
-    for (const v of r.violations) {
-      (r.vmap[v.seq] ||= []).push(v);
-      for (const [s, t] of v.evidence) (r.emap[s] ||= []).push([v.seq, v.rule, t]);
-    }
   }
-  for (const s of ORDER) state.run[s] = RUN[FEATURED[s]] ? FEATURED[s] : BY[s][0]?.name;
+  BY.chat.sort((a, b) => a.name.localeCompare(b.name));
+  for (const s of ORDER) state.run[s] = RUN[FEATURED[s]] ? FEATURED[s] : s === "chat" ? BY.chat.at(-1)?.name : BY[s][0]?.name;
+  state.chatSig = `${BY.chat.length}|${state.run.chat}|${RUN[state.run.chat]?.events.length ?? 0}`;
   const phase1 = data.runs.filter(r => r.phase === "phase1");
   const base = phase1.length ? phase1 : data.runs;
   const set = (sel, text) => { for (const el of document.querySelectorAll(sel)) el.textContent = text; };
@@ -829,6 +878,7 @@ selectTab(ORDER.includes(first) ? first : "s1", false);
 fetch("/api/runs")
   .then(res => { if (!res.ok) throw new Error(`the server answered ${res.status}`); return res.json(); })
   .then(boot)
+  .then(pollChats)
   .catch(err => {
     for (const v of document.querySelectorAll(".viewer")) {
       v.innerHTML = `<p class="loaderr">Could not load the traces (${esc(err.message)}). Start the viewer with <code>uv run viewer.py</code> and reload.</p>`;
