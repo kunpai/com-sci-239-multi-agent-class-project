@@ -19,12 +19,15 @@ to them, and answers the user.
 
 - **Agents.** There are three roles, each LLM-based, with one file per role in `agents/`:
   - **CEO:** always present. It receives every user request and holds the whole budget.
-  - **Manager:** hired at runtime. It uses tools and may hire workers out of its own reservation.
+  - **Manager:** hired at runtime. It uses tools and may hire managers and workers out of its own reservation.
   - **Worker:** hired at runtime. It answers once and has no tools.
 - **Coordination.** Centralized and hierarchical, with dynamic interactions:
   - The CEO picks at runtime how many agents to hire, in which roles and on which models.
   - Every agent has exactly one hirer. It may message only agents it hired and fire only agents below it.
-  - Hiring stops 2 levels below the CEO.
+  - Hiring stops 2 levels below the CEO. Within that depth there is no limit on how many agents are hired.
+  - `hire_agent` rejects a hire only for depth, a fired caller, or a bad name, role, model or budget value. It
+    doesn't compare `budget_usd` with the money left in the pool, or the model's size with free memory. P1 and
+    P2 state those limits, and nothing enforces them in this version.
 - **Local or cloud.** Each hire runs either on a local Ollama model, which uses machine memory, or on a cloud
   model through LiteLLM, which costs API dollars. `check_usage` reports both.
 - **Protocols.**
