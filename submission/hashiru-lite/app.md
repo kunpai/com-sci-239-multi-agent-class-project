@@ -51,5 +51,5 @@ to them, and answers the user.
 
 `check.py` reports each policy under its ID in `requirements.md`, so a P1 violation prints as `R1`.
 
-The episodes in `episodes/` come from real traces shipped in the source archive under `src/traces/`. The
+The episodes in `episodes/` come from real traces shipped in the whole archive under `src/traces/`. The
 exception is `example4`, which is hypothetical.

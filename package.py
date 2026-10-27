@@ -1,10 +1,11 @@
 """Build the two CS239 submission archives into dist/, after checking the docs against the code.
 
-Usage: uv run package.py                 # dist/KunalPai-hashiru-lite-306152378.tar.gz and ...-src.tar.gz
+Usage: uv run package.py                 # dist/KunalPai-hashiru-lite-306152378-requirements.tar.gz and ...-whole.tar.gz
        uv run package.py --name X --uid Y
 
-Archive 1 is submission/<app>/ (app.md, policy.md, tools.md, agents/, episodes/).
-Archive 2 is every committed file except submission/, under src/. It comes from HEAD, so commit first.
+Archive 1 (requirements) is submission/<app>/ (app.md, policy.md, tools.md, agents/, episodes/).
+Archive 2 (whole) is every committed file under src/: code, requirements, tests and traces. It comes from
+HEAD, so commit first.
 """
 import argparse
 import asyncio
@@ -55,17 +56,17 @@ def problems(app_dir: Path) -> list[str]:
     dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
                            capture_output=True, text=True, check=True).stdout
     if dirty:
-        found.append("uncommitted changes: the source archive is built from HEAD, so commit them first")
+        found.append("uncommitted changes: the whole archive is built from HEAD, so commit them first")
     return found
 
 
 def build(name: str, uid: str, app: str, out: Path) -> tuple[Path, Path]:
     out.mkdir(exist_ok=True)
-    docs, src = out / f"{name}-{app}-{uid}.tar.gz", out / f"{name}-{app}-{uid}-src.tar.gz"
+    docs, src = out / f"{name}-{app}-{uid}-requirements.tar.gz", out / f"{name}-{app}-{uid}-whole.tar.gz"
     with tarfile.open(docs, "w:gz") as tar:
         tar.add(ROOT / "submission" / app, arcname=app, filter=lambda t: None if t.name.endswith(".DS_Store") else t)
-    subprocess.run(["git", "archive", "--format=tar.gz", "--prefix=src/", "-o", str(src), "HEAD",
-                    "--", ".", ":(exclude)submission"], cwd=ROOT, check=True)
+    subprocess.run(["git", "archive", "--format=tar.gz", "--prefix=src/", "-o", str(src), "HEAD"],
+                   cwd=ROOT, check=True)
     return docs, src
 
 

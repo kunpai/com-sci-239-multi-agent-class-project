@@ -2,8 +2,8 @@
 
 The policy is five rules, P1–P5. Each one is a requirement from [requirements.md](requirements.md), stated as
 something an agent must do. The full wording of each policy, including its conditions and exceptions, is in
-`policy.md` in the description archive (`submission/hashiru-lite/policy.md` in the repository). This file
-describes how the policies are given to agents and checked.
+[submission/hashiru-lite/policy.md](submission/hashiru-lite/policy.md). This file describes how the policies
+are given to agents and checked.
 
 In Phase 1 (tag `phase1`) the policy is prompt text only:
 - **Who is told:** the CEO and every manager get it in their system prompt (`agent.POLICY`). Workers don't,

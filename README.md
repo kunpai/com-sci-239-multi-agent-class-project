@@ -109,6 +109,8 @@ LLM output varies from run to run, even at temperature 0.
 | `traces/` | Recorded runs: `phase1/` (S1–S3, three each) and `chat/`. See [traces/README.md](traces/README.md) |
 | `tests/` | 90 pytest cases. Each case is described in [tests/README.md](tests/README.md) |
 | `requirements.md`, `POLICY.md` | The requirements R1–R5 and how the policy is given to agents and checked |
+| `submission/hashiru-lite/` | The CS239 application description: `app.md`, `policy.md` (P1–P5), `tools.md`, `agents/` and `episodes/` |
+| `package.py` | Checks the description against the code, then builds both submission archives into `dist/` |
 
 ## Phase 1
 
