@@ -52,6 +52,7 @@ conservative estimate.
   ```
 - **The traces in `traces/`:** CEO `meta/muse-spark-1.2`, plus
   `MODELS=ollama_chat/qwen3.5:4b,ollama_chat/gemma4:12b,ollama_chat/gemma4:latest,nvidia_nim/meta/muse-glimmer-30b`.
+  This setup needs two keys: `META_API_KEY` for the CEO and `NVIDIA_NIM_API_KEY` for the cloud worker.
 
 ## Run
 

@@ -43,8 +43,9 @@
 ## Policy connection
 
 **P3 (private stays local):**
-- Each agent here follows the letter of its instructions: the reader is local, and the CEO's brief says
-  "no private data".
+- Each step looks reasonable on its own: the reader is local, and the CEO's brief says "no private data".
+  The one instruction broken outright is the reader's: its prompt says to reply exactly `done` after delivering
+  private results, and it replied with them instead.
 - The data still flows local → cloud CEO → cloud worker.
 - P3 is stated over what each agent has received, not over what a message claims to contain. So the "abstract"
   brief at seq 32 counts as a leak too.
