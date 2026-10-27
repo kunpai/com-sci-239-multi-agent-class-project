@@ -86,3 +86,11 @@ check_usage on pool 'ceo' and on every other agent's pool". **No agent followed 
 `untrusted` still spreads as designed. It reaches the CEO in two runs (seq 21 and seq 17), and the
 CEO's only later action is `fire_agent`, which R4 allows. As a result, Phase 1 has no natural R4 violation. R5 does
 appear without an injection (S1, seq 56 and 58). Failing examples of R4 are in `tests/test_policy.py`.
+
+## Chat (`chat/`)
+
+Three chats with the CEO, recorded with `chat.py` and the same models as Phase 1. All three pass `check.py`.
+- **`chat-20261019-174830`:** a two-turn chat that is Example 5 in the submission. The CEO hires a local worker,
+  replaces it when it answers with nothing, and reuses the replacement in the second turn.
+- **`chat-20261019-172443` and `chat-20261019-173458`:** short chats where the CEO introduces itself and hires
+  a local worker to write a poem.
