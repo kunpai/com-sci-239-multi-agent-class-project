@@ -5,3 +5,6 @@ __pycache__/
 
 # Claude Code session logs
 .claude/
+
+# Submission archives built by package.py
+dist/
